@@ -437,6 +437,8 @@
 
 ;; ----------------------------------------------------------------------------
 ;; Distribution
+(include "proxy-type.scm")
+(include "remote-list.scm")
 
 ;; Convert a 'pid'
 (define (pid->upid obj)
@@ -466,20 +468,48 @@
 		(mutex-unlock! *global-mutex*)
 		obj))))
 
+(define max-counter 5)
+
+;; Ajout de proxy lst dans termite
+(define (make-list-proxy lst)
+  (let ((proxy
+          (spawn
+            (lambda ()
+              (let loop ()
+                (recv
+                  ((from tag 'cdr)
+                   (! from (list tag (cdr newlst))))
+                  ((from tag 'cddr)
+                   (! from (list tag (cddr newlst))))
+                  ((from tag 'car)
+                   (! from (list tag (car lst))))
+                  (msg
+                    (warning "Ignore msg " msg)))
+                (loop))))))
+    (make-proxy (pid->upid proxy))))
 
 (define (serialize-hook obj)
+  (define count 0)
   (cond
-	((process? obj)
-	 (pid->upid obj))
+    ((process? obj)
+     (pid->upid obj))
 
-	((tag? obj) 
-	 (tag->utag obj))
+    ((tag? obj) 
+     (tag->utag obj))
 
-	;; unserializable objects, so instead of crashing we set them to #f
-	((or (port? obj)) 
-	 #f)
+    ;; Ajout dans termite
+    ((pair? obj)
+     (if (< count max-counter)
+       (begin
+         (set! count (+ count 1))
+         obj)
+       (make-list-proxy obj)))
 
-	(else obj)))
+    ;; unserializable objects, so instead of crashing we set them to #f
+    ((or (port? obj)) 
+     #f)
+
+    (else obj)))
 
 (define (upid->pid obj)
   (cond
