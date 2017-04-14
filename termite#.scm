@@ -57,4 +57,5 @@
 (include "recv.scm")
 (include "deftype.scm")
 (include "uuid.scm")
+(include "remote-list.scm")
 

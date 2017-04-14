@@ -438,7 +438,6 @@
 ;; ----------------------------------------------------------------------------
 ;; Distribution
 (include "proxy-type.scm")
-(include "remote-list.scm")
 
 ;; Convert a 'pid'
 (define (pid->upid obj)
