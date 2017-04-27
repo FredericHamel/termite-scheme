@@ -62,6 +62,11 @@
   id: efa4f5f8-c74c-465b-af93-720d44a08374
   (uuid init: #f))
 
+;; proxy
+(define-type proxy
+  id: 1d0a2e32-ab57-4544-8c3f-2cf4af25f289
+  upid)
+
 ;; * Test whether 'obj' is a pid.
 (define (pid? obj)
   (or (process? obj) (upid? obj)))
@@ -437,7 +442,6 @@
 
 ;; ----------------------------------------------------------------------------
 ;; Distribution
-(include "proxy-type.scm")
 
 ;; Convert a 'pid'
 (define (pid->upid obj)
@@ -467,7 +471,22 @@
 		(mutex-unlock! *global-mutex*)
 		obj))))
 
-(define max-counter 5)
+
+;; Should use process
+(define get-max-counter #f)
+(define set-max-counter! #f)
+
+(let ((max-counter 20))
+   (set! get-max-counter
+     (lambda ()
+       max-counter))
+   (set! set-max-counter!
+     (lambda (newval)
+       (if (> newval 5)
+         (begin
+           (set! max-counter newval)
+           #t)
+         #f))))
 
 ;; Ajout de proxy lst dans termite
 (define (make-list-proxy lst)
@@ -476,39 +495,39 @@
             (lambda ()
               (let loop ()
                 (recv
-                  ((from tag 'cdr)
-                   (! from (list tag (cdr newlst))))
-                  ((from tag 'cddr)
-                   (! from (list tag (cddr newlst))))
-                  ((from tag 'car)
-                   (! from (list tag (car lst))))
+                  ((from tag 'get)
+                   (! from (list tag (force lst))))
                   (msg
                     (warning "Ignore msg " msg)))
                 (loop))))))
-    (make-proxy (pid->upid proxy))))
+      (make-proxy proxy)))
 
-(define (serialize-hook obj)
-  (define count 0)
-  (cond
-    ((process? obj)
-     (pid->upid obj))
+(define (serialize-hook count)
+  (define max-counter (get-max-counter))
+  (lambda (obj)
+    (cond
+      ((process? obj)
+       (pid->upid obj))
 
-    ((tag? obj) 
-     (tag->utag obj))
+      ((tag? obj) 
+       (tag->utag obj))
 
-    ;; Ajout dans termite
-    ((pair? obj)
-     (if (< count max-counter)
+      ;; Ajout dans termite
+      ((pair? obj)
        (begin
-         (set! count (+ count 1))
-         obj)
-       (make-list-proxy obj)))
+          (println "serialize-hook: " (object->string obj 200))
+         (if (< count max-counter)
+           (begin
+             (set! count (+ count 1)) obj)
+           (begin
+             (set! count 0)
+             (make-list-proxy obj)))))
 
-    ;; unserializable objects, so instead of crashing we set them to #f
-    ((or (port? obj)) 
-     #f)
+      ;; unserializable objects, so instead of crashing we set them to #f
+      ((or (port? obj)) 
+       #f)
 
-    (else obj)))
+      (else obj))))
 
 (define (upid->pid obj)
   (cond
@@ -530,18 +549,23 @@
 
 (define (deserialize-hook obj)
   (cond
-	((and (upid? obj)
-		  (equal? (upid-node obj)
-				  (current-node)))
-	 (upid->pid obj))
-	((tag? obj)
-	 (utag->tag obj))
-	(else obj)))
+    ((and (upid? obj)
+          (equal? (upid-node obj)
+                  (current-node)))
+     (upid->pid obj))
+    ((proxy? obj)
+     (let ((p (proxy-upid obj)))
+       (delay
+         ; Timeout: 6min
+         (!? p 'get))))
+    ((tag? obj)
+     (utag->tag obj))
+    (else obj)))
 
 
 (define (serialize obj port)
   (let* ((serialized-obj
-		   (object->u8vector obj serialize-hook))
+		   (object->u8vector obj (serialize-hook 0)))
 		 (len
 		   (u8vector-length serialized-obj))
 		 (serialized-len
@@ -637,24 +661,24 @@
 (define (initiate-messenger node)
   ;; (print "OUTBOUND connection established\n")
   (spawn
-	(lambda ()
-	  (with-exception-catcher
-		(lambda (e)
-		  (! dispatcher (list 'unregister (self)))
-		  (shutdown!))
+    (lambda ()
+      (with-exception-catcher
+        (lambda (e)
+          (! dispatcher (list 'unregister (self)))
+          (shutdown!))
 
-		(lambda ()
-		  (let ((socket (open-tcp-client
-						  (list server-address: (node-host node)
-								port-number:    (node-port node)
-								coalesce:       #f))))
-			;; the real interesting part
-			(let ((in  (start-serializing-active-input-port socket (self)))
-				  (out (start-serializing-output-port socket)))
+        (lambda ()
+          (let ((socket (open-tcp-client
+                          (list server-address: (node-host node)
+                                port-number:    (node-port node)
+                                coalesce:       #f))))
+            ;; the real interesting part
+            (let ((in  (start-serializing-active-input-port socket (self)))
+                  (out (start-serializing-output-port socket)))
 
-			  (! out (list 'write (current-node)))
+              (! out (list 'write (current-node)))
 
-			  (messenger-loop node in out))))))
+              (messenger-loop node in out))))))
     name: 'termite-outbound-messenger))
 
 
@@ -690,7 +714,7 @@
 	;; outgoing message
 	(('relay to message)
 	 ;; 'to' is a upid
-	 (let* ((id (upid-tag to))
+	 (let ((id (upid-tag to))
 			;; (node (upid-node to))
 			;; (host (node-host node))
 			;; (port (node-id node))
@@ -725,8 +749,8 @@
 			   ;; for performance reasons, but if the programmer wants to do 
 			   ;; that, then OK...)
 			   ((equal? node (current-node))
-				(! (upid->pid upid) message)
-				(loop known-nodes))
+          (! (upid->pid upid) message)
+          (loop known-nodes))
 
 			   ;; the message is destined to a pid on a known node
 			   ((assoc node known-nodes)
@@ -741,8 +765,8 @@
 				   (loop (cons (cons node messenger) known-nodes)))))))
 
 		  (msg
-			(warning "dispatcher ignored message: " msg) ;; uh...
-			(loop known-nodes)))))
+        (warning "dispatcher ignored message: " msg) ;; uh...
+        (loop known-nodes)))))
     name: 'termite-dispatcher))
 
 

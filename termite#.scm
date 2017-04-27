@@ -31,11 +31,15 @@
 			  ;; Publishing and resolving names for services
 			  publish-service unpublish-service resolve-service remote-service
 			  ;; default init and node names for convenience
+
 			  init node1 node2
 			  *termite-nameserver-port*
 			  *termite-cookie*
 			  ;; Useful
 			  ping
+        ;; Lazyness paremeter
+        get-max-counter
+        set-max-counter!
 			  ))
 
 
@@ -45,10 +49,11 @@
 
 ;; make it available at compile-time
 (compile-time-load "~~lib/termite/match-support.scm")
+(compile-time-load "~~lib/termite/remote-list.scm")
 
 ;; make it available at run-time
 (##include "match-support.scm")
-
+(##include "remote-list.scm")
 
 ;; ----------------------------------------------------------------------------
 ;; Macros 
@@ -57,5 +62,4 @@
 (include "recv.scm")
 (include "deftype.scm")
 (include "uuid.scm")
-(include "remote-list.scm")
 
