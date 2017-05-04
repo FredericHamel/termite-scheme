@@ -67,6 +67,11 @@
   id: 1d0a2e32-ab57-4544-8c3f-2cf4af25f289
   upid)
 
+;; proxy-callback
+(define-type proxy-callback
+  id: 01a2b160-0fe6-4cf0-911f-e76e085b1015
+  thunk)
+
 ;; * Test whether 'obj' is a pid.
 (define (pid? obj)
   (or (process? obj) (upid? obj)))
@@ -496,32 +501,50 @@
               (let loop ()
                 (recv
                   ((from tag 'get)
-                   (! from (list tag (force lst))))
+                   (! from (list tag lst)))
                   (msg
                     (warning "Ignore msg " msg)))
-                (loop))))))
-      (make-proxy proxy)))
+                (loop)))
+            name: 'proxy)))
+    (let ((p (make-proxy proxy)))
+      p)))
 
 (define (serialize-hook count)
   (define max-counter (get-max-counter))
+  (define (reset-count) (set! count 0))
   (lambda (obj)
     (cond
+      ((##promise? obj)
+        (begin
+          ;; Unpack promise
+          (reset-count)
+          (let ((thunk (##promise-thunk obj)))
+            (if thunk
+              (make-proxy-callback thunk)
+              (##promise-result obj)))))
+
       ((process? obj)
        (pid->upid obj))
 
-      ((tag? obj) 
+      ((tag? obj)
        (tag->utag obj))
+
+      ((null? obj)
+       (begin
+         (reset-count)
+         obj))
 
       ;; Ajout dans termite
       ((pair? obj)
        (begin
-          (println "serialize-hook: " (object->string obj 200))
          (if (< count max-counter)
            (begin
-             (set! count (+ count 1)) obj)
+             (set! count (+ count 1))
+             obj)
            (begin
-             (set! count 0)
+             (reset-count)
              (make-list-proxy obj)))))
+
 
       ;; unserializable objects, so instead of crashing we set them to #f
       ((or (port? obj)) 
@@ -553,11 +576,16 @@
           (equal? (upid-node obj)
                   (current-node)))
      (upid->pid obj))
+
+    ((proxy-callback? obj)
+     (##make-promise (proxy-callback-thunk obj)))
+
     ((proxy? obj)
      (let ((p (proxy-upid obj)))
        (delay
          ; Timeout: 6min
-         (!? p 'get))))
+         (!? p 'get 360 'relay))))
+
     ((tag? obj)
      (utag->tag obj))
     (else obj)))
