@@ -467,42 +467,70 @@
 		(mutex-unlock! *global-mutex*)
 		obj))))
 
-(define max-counter 5)
+(define preprocess #f)
+(define max-length-set! #f)
+(define max-depth-set! #f)
 
-;; Ajout de proxy lst dans termite
-(define (make-list-proxy lst)
-  (let ((proxy
-          (spawn
-            (lambda ()
-              (let loop ()
-                (recv
-                  ((from tag 'cdr)
-                   (! from (list tag (cdr newlst))))
-                  ((from tag 'cddr)
-                   (! from (list tag (cddr newlst))))
-                  ((from tag 'car)
-                   (! from (list tag (car lst))))
-                  (msg
-                    (warning "Ignore msg " msg)))
-                (loop))))))
-    (make-proxy (pid->upid proxy))))
+(let ((max-length 20)
+      (max-depth 5))
+  ;; Ajout de proxy lst dans termite
+  (define (make-list-proxy lst)
+    (let ((proxy
+            (spawn
+              (lambda ()
+                (let loop ()
+                  (recv
+                    ((from tag 'cdr)
+                     (! from (list tag (cdr lst))))
+                    ((from tag 'cddr)
+                     (! from (list tag (cddr lst))))
+                    ((from tag 'car)
+                     (! from (list tag (car lst))))
+                    (msg
+                      (warning "Ignore msg " msg)))
+                  (loop))))))
+      (make-proxy (pid->upid proxy))))
+
+  (set! max-length-set!
+    (lambda (val)
+      (if (< val 6)
+        (error "Invalid length " val)
+        (set! max-length val))))
+  
+  (set! max-depth-set!
+    (lambda (val)
+      (if (< val 1)
+        (error "Invalid depth " val)
+        (set! max-depth val))))
+  
+  (set! preprocess
+    (lambda (obj)
+      (let loop ((o obj) (len 0) (depth 0))
+        (if (and (< len max-length)
+                 (< depth max-depth))
+          (cond
+            ((pair? o)
+             (cons
+               (loop (car o) len (+ depth 1))
+               (loop (cdr o) (+ len 1) depth)))
+            
+            ((and (procedure? o) (##closure? o))
+             ;; Only work for interpreter
+             o)
+            (else o))
+          (if (pair? o)
+            (make-list-proxy o)
+            o))))))
+             
+
 
 (define (serialize-hook obj)
-  (define count 0)
   (cond
     ((process? obj)
      (pid->upid obj))
 
     ((tag? obj) 
      (tag->utag obj))
-
-    ;; Ajout dans termite
-    ((pair? obj)
-     (if (< count max-counter)
-       (begin
-         (set! count (+ count 1))
-         obj)
-       (make-list-proxy obj)))
 
     ;; unserializable objects, so instead of crashing we set them to #f
     ((or (port? obj)) 
@@ -540,19 +568,21 @@
 
 
 (define (serialize obj port)
-  (let* ((serialized-obj
-		   (object->u8vector obj serialize-hook))
-		 (len
-		   (u8vector-length serialized-obj))
-		 (serialized-len
-		   (u8vector (bitwise-and len #xff)
-					 (bitwise-and (arithmetic-shift len -8) #xff)
-					 (bitwise-and (arithmetic-shift len -16) #xff)
-					 (bitwise-and (arithmetic-shift len -24) #xff))))
+  (let* ((preprocess-obj
+           (preprocess obj))
+         (serialized-obj
+           (object->u8vector preprocess-obj serialize-hook))
+         (len
+           (u8vector-length serialized-obj))
+         (serialized-len
+           (u8vector (bitwise-and len #xff)
+                     (bitwise-and (arithmetic-shift len -8) #xff)
+                     (bitwise-and (arithmetic-shift len -16) #xff)
+                     (bitwise-and (arithmetic-shift len -24) #xff))))
 
-	(begin
-	  (write-subu8vector serialized-len 0 4 port)
-	  (write-subu8vector serialized-obj 0 len port))))
+    (begin
+      (write-subu8vector serialized-len 0 4 port)
+      (write-subu8vector serialized-obj 0 len port))))
 
 
 (define (deserialize port)

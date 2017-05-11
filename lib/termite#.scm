@@ -36,6 +36,9 @@
 			  *termite-cookie*
 			  ;; Useful
 			  ping
+        ;; Lazy transmission
+        max-length-set!
+        max-depth-set!
 			  ))
 
 
