@@ -38,8 +38,8 @@
 			  ;; Useful
 			  ping
         ;; Lazyness paremeter
-        get-max-counter
-        set-max-counter!
+        max-length-set!
+        max-depth-set!
 			  ))
 
 
