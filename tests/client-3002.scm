@@ -1,12 +1,8 @@
 
+(load "data-server-common")
+
 (define server (make-node "localhost" 3001))
 (define client (make-node "localhost" 3002))
-
-(define (remote-get n var)
-  (!? (remote-service 'data-server n) (list 'get var)))
-
-(define (remote-set! n var val)
-  (!? (remote-service 'data-server n) (list 'set var val)))
 
 (define (id x) x)
 
@@ -18,23 +14,23 @@
       lst)))
 
 (define (clone lst)
-  (map (lambda (x)
-         (if (list? x)
-           (clone x)
-           x)) lst))
+  (map (lambda (x) (if (pair? x) (clone x) x)) lst))
 
-(define-macro (closure f . var)
-  `((lambda ,var
-      ,f) ,@var))
+(define lst (range 0 100))
 
-(define lst (range 0 32))
+(define my_lst (map (lambda (x) (clone lst)) lst))
 
-(define my_lst
-  (let ((lst (range 0 32)))
-    (map (lambda (x) (clone lst)) lst)))
-
-(define big_lst
-  (map (lambda (x) (clone my_lst)) my_lst))
+(define big_lst (map (lambda (x) (clone my_lst)) my_lst))
 
 (node-init client)
 
+(max-length-set! 100)
+(max-depth-set! 5)
+(pp (remote-set! server "x" my_lst))
+(remote-spawn
+  server
+  (lambda ()
+    (let ((x (assoc "x" env)))
+      (time (pp x))
+      (read-line)
+      (time (pp x)))))
