@@ -24,13 +24,11 @@
 
 (node-init client)
 
-(max-length-set! 100)
-(max-depth-set! 5)
+; (max-length-set! 100)
+; (max-depth-set! 5)
 (pp (remote-set! server "x" my_lst))
 (remote-spawn
   server
   (lambda ()
     (let ((x (assoc "x" env)))
-      (time (pp x))
-      (read-line)
       (time (pp x)))))
