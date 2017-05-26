@@ -23,7 +23,6 @@
 
 (node-init client)
 
-(println (eq? max-length-set! #!unbound))
 (if (not
       (and (eq? max-length-set! #!unbound)
            (eq? max-depth-set! #!unbound)))

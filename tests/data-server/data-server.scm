@@ -56,7 +56,7 @@
           p)))))
          
 
-;(println (find-promise env))
+(println (find-promise env))
 
 (println "Press any key to quit...")
 (read-char)
