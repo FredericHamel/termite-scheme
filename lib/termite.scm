@@ -484,16 +484,16 @@
       (let loop ()
         (recv
           ((from tag 'get)
+           (println "Request promise")
            (! from (list tag lst)))
           (msg
             (warning "Ignore msg " msg)))
         (loop)))
     name: 'proxy))
 
-
-(define preprocess #f)
 (define max-length-set! #f)
 (define max-depth-set! #f)
+(define serialize-hook #f)
 
 (let ((max-length 20)
       (max-depth 5))
@@ -507,81 +507,43 @@
       (if (< x 1)
         (error "Invalid depth " x)
         (set! max-depth x))))
-  (set! preprocess
-    (lambda (obj)
-
-      (define (preprocess-closure-env env)
-        (let* ((env-size (vector-length env))
-               (new-env (make-vector env-size)))
-          (let loop ((i 0))
-            (if (< i env-size)
-              (let ((e (vector-ref env i)))
-                (cond
-                  ((or (pair? e) (vector? e))
-                   (vector-set! new-env i (make-proxy (delay (make-element-proxy e)))))
-                  (else (vector-set! new-env i e)))
-                (loop (+ i 1)))
-              new-env))))
-
-      (let loop ((o obj) (depth 0) (len 0))
-        (cond
-          ((pair? o)
-           (if (or (> len max-length)
-                   (> depth max-depth))
-             (make-proxy (delay (make-element-proxy o)))
-             (cons
-               (loop (car o)
-                     (+ depth 1)
-                     len)
-               (loop (cdr o)
-                     depth
-                     (+ len 1)))))
-
-          ; Mimic object->u8vector
-          ;;; TODO patch this code to make-it work in compiled version
-          ((procedure? o)
-           (if (##closure? o)
-             ;; Fonctionnel dans le cas de l'interprète.
-             (let ((new-clo (##make-closure (##closure-code o) 3))
-                   (clo-env (##closure-ref o 3)))
-               (##vector-set! new-clo 1 (##closure-ref o 1))
-               (##vector-set! new-clo 2 (##closure-ref o 2))
-               ;; Copy preprocesse clo-env
-               (##vector-set! new-clo 3
-                (if clo-env (preprocess-closure-env clo-env) clo-env)))
-             o))
-
-          (else
-            o))))))
-
-(define serialize-hook
-  (lambda (obj)
-    (cond
-      ;; Unpack promise instead of force
-      ((##promise? obj)
-        (begin
-          (let ((thunk (##promise-thunk obj)))
-            (if thunk
-              (make-proxy-callback thunk)
-              (##promise-result obj)))))
-
-      ((proxy? obj)
-       (let ((pid (force (proxy-upid obj))))
+  (set! serialize-hook
+    (lambda (obj len depth)
+      (cond
+        ;; Unpack promise instead of force
+        ((##promise? obj)
          (begin
-           (proxy-upid-set! obj pid)
-           obj)))
+           (let ((thunk (##promise-thunk obj)))
+             (if thunk
+               (make-proxy-callback thunk)
+               (##promise-result obj)))))
 
-      ((process? obj)
-       (pid->upid obj))
+        ((proxy? obj)
+         (let ((pid (force (proxy-upid obj))))
+           (begin
+             (proxy-upid-set! obj pid)
+             obj)))
 
-      ((tag? obj)
-       (tag->utag obj))
+        ((process? obj)
+         (pid->upid obj))
 
-      ;; unserializable objects, so instead of crashing we set them to #f
-      ((or (port? obj)) 
-       #f)
+        ((tag? obj)
+         (tag->utag obj))
+        
+        ((or (pair? obj)
+             (vector? obj))
+            ; (procedure? obj))
+         (if (or
+               (> len max-length)
+               (> depth max-depth))
+           (make-proxy (make-element-proxy obj))
+           obj))
 
-      (else obj))))
+        ;; unserializable objects, so instead of crashing we set them to #f
+        ((or (port? obj)) 
+         #f)
+
+        (else obj)))))
 
 (define (upid->pid obj)
   (cond
@@ -623,9 +585,9 @@
 
 
 (define (serialize obj port)
-  (let* ((preprocess-obj (preprocess obj))
-     (serialized-obj
-		   (object->u8vector preprocess-obj serialize-hook))
+  (let* ((serialized-obj
+            ;; Strange bug need to call primitive.
+            (lazy-object->u8vector obj serialize-hook))
 		 (len
 		   (u8vector-length serialized-obj))
 		 (serialized-len
