@@ -513,6 +513,7 @@
         (set! max-depth x))))
   (set! serialize-hook
     (lambda (obj len depth)
+      ;(println "Serialize-hook: " (object->string obj 255))
       (cond
         ;; Unpack promise instead of force
         ((##promise? obj)
@@ -538,8 +539,20 @@
         ((vector? obj)
          obj)
 
-        ((or (pair? obj)
-             (procedure? obj))
+        ;((procedure? obj)
+        ; (let ((name (##procedure-name obj)))
+        ;   (if (and name
+        ;            (not (char=? (string-ref (symbol->string name) 1)
+        ;                    #\#)))
+        ;     obj
+        ;     (if (or
+        ;           (> len max-length)
+        ;           (> depth max-depth))
+        ;       (make-proxy (make-element-proxy obj))
+        ;       obj))))
+             
+        
+        ((pair? obj)
          (if (or
                (> len max-length)
                (> depth max-depth))
@@ -593,7 +606,6 @@
 
 (define (serialize obj port)
   (let* ((serialized-obj
-            ;; Strange bug need to call primitive.
             (lazy-object->u8vector obj serialize-hook))
 		 (len
 		   (u8vector-length serialized-obj))
