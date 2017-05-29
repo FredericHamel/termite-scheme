@@ -33,10 +33,16 @@ c_compile() {
   for i in ${obj[@]}; do
     echo "Compiling object $i"
     tsic $i
+    if (( $? != 0 )); then
+      exit 1
+    fi
   done
   for i in "${exe[@]}"; do
     echo "Compiling executable $i"
     tsic -exe $i
+    if (( $? != 0 )); then
+      exit 1
+    fi
   done
 }
 

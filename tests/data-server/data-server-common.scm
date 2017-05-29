@@ -14,10 +14,9 @@
   (lambda ()
     (println from msg)))
 
-(define (test1 var)
+;; Print on the server side if the variable is set.
+(define (remote-lookup k var)
   (lambda ()
-    (let ((env (eval 'env)))
-      (let ((pvar (assoc var env)))
-        (time (pp (eval 'env)))
-        (time (pp pvar))))))
-
+    (let* ((nenv (eval 'env))
+           (pvar (assoc var nenv)))
+        (k (pair? pvar)))))

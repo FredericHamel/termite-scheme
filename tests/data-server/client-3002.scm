@@ -34,14 +34,7 @@
 (println "Press enter to continue...")
 (read-char)
 
-(remote-spawn
-  server
-  (test1 "x"))
-
-(remote-spawn
-  server
-  (create-msg client "Salut"))
-
+(remote-spawn server (remote-lookup println "x"))
 
 (println "Press any key to quit...")
 (read-char)

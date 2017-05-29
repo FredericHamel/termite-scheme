@@ -37,26 +37,5 @@
 (node-init node)
 (publish-service 'data-server data-server)
 
-(println "Press any key to print x...")
-(read-char)
-
-(define (find-promise env)
-  (define (until pred env)
-    (if (pred env)
-      "<promise n>"
-      (if (pair? env)
-        (until pred (cdr env))
-        'fail)))
-  (if (pair? env)
-    (let ((fst (car env))
-          (tl (cdr env)))
-      (let ((p (until ##promise? fst)))
-        (if (eq? 'fail p)
-          (find-promise tl)
-          p)))))
-         
-
-(println (find-promise env))
-
 (println "Press any key to quit...")
 (read-char)
