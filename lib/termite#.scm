@@ -14,6 +14,7 @@
 			  spawn-output-port spawn-input-port
 			  ;; Exceptions...
 			  termite-exception? ;; actually that has to be exported for RECV ... :(
+        handle-exception-message
 			  ;; Migration
 			  migrate-task migrate/proxy 
 			  ;; Useful condition reporting/logging procedures
