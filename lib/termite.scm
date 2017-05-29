@@ -477,19 +477,23 @@
 		obj))))
 
 
-;; Ajout de proxy lst dans termite
-(define (make-element-proxy lst)
-  (spawn
-    (lambda ()
-      (let loop ()
-        (recv
-          ((from tag 'get)
-           (println "Request promise")
-           (! from (list tag lst)))
-          (msg
-            (warning "Ignore msg " msg)))
-        (loop)))
-    name: 'proxy))
+;; Create a element proxy-thread
+(define (make-element-proxy elem)
+  (let ((proxy-thread
+          (spawn
+            (lambda ()
+              (let loop ()
+                (recv
+                  ((from tag 'get)
+                   (! from (list tag elem)))
+                  ((from tag 'clean)
+                   ;; Should clean
+                   #f)
+                  (msg
+                    (warning "Ignore msg " msg)))
+                (loop)))
+            name: 'proxy)))
+    (pid->upid proxy-thread)))
 
 (define max-length-set! #f)
 (define max-depth-set! #f)
@@ -530,9 +534,12 @@
         ((tag? obj)
          (tag->utag obj))
         
+        ;; Do not replace vector with promise
+        ((vector? obj)
+         obj)
+
         ((or (pair? obj)
-             (vector? obj))
-            ; (procedure? obj))
+             (procedure? obj))
          (if (or
                (> len max-length)
                (> depth max-depth))
