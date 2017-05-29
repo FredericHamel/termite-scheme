@@ -14,9 +14,17 @@
   (lambda ()
     (println from msg)))
 
-;; Print on the server side if the variable is set.
-(define (remote-lookup k var)
+;; Fetch the existance of variable.
+(define (remote-lookup var)
   (lambda ()
     (let* ((nenv (eval 'env))
            (pvar (assoc var nenv)))
-        (k (pair? pvar)))))
+      (pair? pvar))))
+
+(define (remote-print var)
+  (lambda ()
+    (let* ((nenv (eval 'env))
+           (pvar (assoc var nenv)))
+      (if (pair? pvar)
+        (pp (cdr pvar))
+        (println #f)))))

@@ -21,20 +21,22 @@
 
 (define big_lst (map (lambda (x) (clone my_lst)) my_lst))
 
+(define (remote-exist server var)
+  (if (on server (remote-lookup var))
+    (println "Found " var)
+    (println "No " var " found")))
+
 (node-init client)
 
-(if (not
-      (and (eq? max-length-set! #!unbound)
-           (eq? max-depth-set! #!unbound)))
-  (begin
-    (max-length-set! 100)
-    (max-depth-set! 5)))
+(remote-exist server "x")
 (time (remote-set! server "x" my_lst))
+(remote-exist server "x")
 
 (println "Press enter to continue...")
 (read-char)
 
-(remote-spawn server (remote-lookup println "x"))
+(remote-spawn server (remote-print "x"))
+
 
 (println "Press any key to quit...")
 (read-char)
