@@ -47,6 +47,8 @@ c_compile_file() {
 }
 
 c_compile() {
+  local out
+  local i
   for i in ${obj[@]}; do
     out=${i%.*}.o1
     c_compile_file "Compiling object $i" $i $out
@@ -61,8 +63,6 @@ c_compile() {
       exit 1
     fi
   done
-  unset out
-  unset i
 }
 
 c_add_all() {
