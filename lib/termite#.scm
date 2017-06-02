@@ -38,9 +38,12 @@
 			  *termite-cookie*
 			  ;; Useful
 			  ping
+        ;; Debugging proxy
+        proxy-print-debugging-info
         ;; Lazyness paremeter
         max-length-set!
         max-depth-set!
+        set-lazy-transform!
 			  ))
 
 

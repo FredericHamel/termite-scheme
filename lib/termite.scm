@@ -476,6 +476,20 @@
 		(mutex-unlock! *global-mutex*)
 		obj))))
 
+;; Some debuging info
+(define proxy-counter 0)
+(define proxy-request-counter 0)
+
+;; Print debugging info
+(define (proxy-print-debugging-info)
+  (println "---- PROXY INFO HEADER ----")
+  (println "proxy-counter: " proxy-counter)
+  (println "proxy-request-counter: " proxy-request-counter)
+  (println "---------------------------"))
+
+; Define a simple macro
+(define-macro (macro-inc x)
+  `(set! ,x (+ ,x 1)))
 
 ;; Create a element proxy-thread
 (define (make-element-proxy elem)
@@ -485,6 +499,7 @@
               (let loop ()
                 (recv
                   ((from tag 'get)
+                   (macro-inc proxy-request-counter)
                    (! from (list tag elem)))
                   ((from tag 'clean)
                    ;; Should clean
@@ -493,14 +508,33 @@
                     (warning "Ignore msg " msg)))
                 (loop)))
             name: 'proxy)))
+    (macro-inc proxy-counter)
     (pid->upid proxy-thread)))
 
 (define max-length-set! #f)
 (define max-depth-set! #f)
 (define serialize-hook #f)
+(define set-lazy-transform! #f)
 
 (let ((max-length 20)
       (max-depth 5))
+  (define (lazy-tranform obj len depth)
+    (if (or (> len max-length)
+            (> depth max-depth))
+      (make-proxy (make-element-proxy obj))
+      obj))
+
+  ;; Identity
+  (define (id-transform obj l d) obj)
+
+  (define transform lazy-tranform)
+
+  (set! set-lazy-transform!
+    (lambda (flag)
+      (if flag
+        (set! transform lazy-tranform)
+        (set! transform id-transform))))
+
   (set! max-length-set!
     (lambda (x)
       (if (< x 6)
@@ -536,9 +570,10 @@
          (tag->utag obj))
         
         ;; Do not replace vector with promise
-        ((vector? obj)
-         obj)
+        ;((vector? obj)
+        ; obj)
 
+        ; Identify builtin procedure.
         ;((procedure? obj)
         ; (let ((name (##procedure-name obj)))
         ;   (if (and name
@@ -553,12 +588,8 @@
              
         
         ((pair? obj)
-         (if (or
-               (> len max-length)
-               (> depth max-depth))
-           (make-proxy (make-element-proxy obj))
-           obj))
-
+         (transform obj len depth))
+        
         ;; unserializable objects, so instead of crashing we set them to #f
         ((or (port? obj)) 
          #f)
