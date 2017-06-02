@@ -21,10 +21,10 @@
            (pvar (assoc var nenv)))
       (pair? pvar))))
 
-(define (remote-print var)
+(define (remote-apply thunk var)
   (lambda ()
     (let* ((nenv (eval 'env))
            (pvar (assoc var nenv)))
       (if (pair? pvar)
-        (pp (cdr pvar))
-        (println #f)))))
+        (thunk (cdr pvar))
+        (println "[ERROR] Variable " var " not found in environment")))))

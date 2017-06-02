@@ -39,3 +39,5 @@
 
 (println "Press any key to quit...")
 (read-char)
+
+(proxy-print-debugging-info)
