@@ -1,6 +1,6 @@
 #!/bin/sh
 
-output=()
+output=(_termite.log)
 exe=()
 obj=()
 
@@ -29,21 +29,40 @@ c_clean() {
   fi
 }
 
+c_compile_file() {
+  if (( $# >= 3 )); then
+    if [[ -r $3 ]]; then
+      local in_modify_time=`stat -c %Y $2`
+      local out_modify_time=`stat -c %Y $3`
+      if (( $in_modify_time > $out_modify_time )); then
+        echo $1
+        rm $3
+        tsic $4 $2
+      fi
+    else
+      echo $1
+      tsic $4 $2
+    fi
+  fi
+}
+
 c_compile() {
   for i in ${obj[@]}; do
-    echo "Compiling object $i"
-    tsic $i
+    out=${i%.*}.o1
+    c_compile_file "Compiling object $i" $i $out
     if (( $? != 0 )); then
       exit 1
     fi
   done
   for i in "${exe[@]}"; do
-    echo "Compiling executable $i"
-    tsic -exe $i
+    out=${i%.*}
+    c_compile_file "Compiling executable $i" $i $out -exe
     if (( $? != 0 )); then
       exit 1
     fi
   done
+  unset out
+  unset i
 }
 
 c_add_all() {
@@ -53,9 +72,10 @@ c_add_all() {
   c_exe client-3003.scm
 }
 
+c_clean
+
 if (( $# == 0 )); then
   c_add_all
-  c_clean
   c_compile
 else
   case $1 in
