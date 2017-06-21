@@ -27,15 +27,15 @@
 
 ;; Get the current time in seconds.
 (define (now)
-  (time->seconds 
+  (time->seconds
    (current-time)))
 
 ;; TODO Improve this
-(define (formatted-current-time) 
+(define (formatted-current-time)
   (let* ((port (open-process "date"))
-		 (time (read-line port)))
-	(close-port port)
-	time))
+     (time (read-line port)))
+  (close-port port)
+  time))
 
 ;; ----------------------------------------------------------------------------
 ;; Datatypes
@@ -95,7 +95,7 @@
 (define (base-exception-handler e)
   (continuation-capture
     (lambda (k)
-      (let ((log-crash 
+      (let ((log-crash
               (lambda (e)
                 (termite-log
                   'error
@@ -125,15 +125,15 @@
 ;; * Start a new process executing the code in 'thunk'.
 (define (spawn thunk #!key (links '()) (name 'anonymous))
   (let ((t (make-thread
-			 (lambda ()
-			   (with-exception-handler
-				 base-exception-handler
-				 thunk)
-			   (shutdown!))
+       (lambda ()
+         (with-exception-handler
+         base-exception-handler
+         thunk)
+         (shutdown!))
              name)))
-	(thread-specific-set! t links)
-	(thread-start! t)
-	t))
+  (thread-specific-set! t links)
+  (thread-start! t)
+  t))
 
 
 (define (spawn-linked-to to thunk #!key (name 'anonymous-linked-to))
@@ -144,15 +144,15 @@
 ;; process.
 (define (spawn-link thunk #!key (name 'anonymous-linked))
   (let ((pid (spawn thunk links: (list (self)) name: name)))
-	(outbound-link pid)
-	pid))
+  (outbound-link pid)
+  pid))
 
 
-;; * Start a new process on remote node 'node', executing the code 
+;; * Start a new process on remote node 'node', executing the code
 ;; in 'thunk'.
 (define (remote-spawn node thunk #!key (links '()) (name 'anonymous-remote))
   (if (equal? node (current-node))
-	  (spawn thunk links: links name: name)
+    (spawn thunk links: links name: name)
     (!? (remote-service 'spawner node)
       (list 'spawn thunk links name))))
 
@@ -161,17 +161,17 @@
 ;; link to the current process.
 (define (remote-spawn-link node thunk)
   (let ((pid (remote-spawn node thunk links: (list (self)))))
-	(outbound-link pid)
-	pid))
+  (outbound-link pid)
+  pid))
 
 
 ;; * Cleanly stop the execution of the current process.  Linked
 ;; processes will receive a "normal" exit message.
 (define (shutdown!)
   (for-each
-	(lambda (pid)
-	  (! pid (make-termite-exception (self) 'normal #f)))
-	(process-links (self)))
+  (lambda (pid)
+    (! pid (make-termite-exception (self) 'normal #f)))
+  (process-links (self)))
   (halt!))
 
 ;; this is *not* nice: it wont propagate the exit message to the other
@@ -181,13 +181,13 @@
 
 
 ;; * Forcefully terminate a local process.  Warning: it only works on
-;; local processes!  This should be used with caution. 
+;; local processes!  This should be used with caution.
 (define (terminate! victim)
   (thread-terminate! victim)
   (for-each
-	(lambda (link)
-	  (! link (make-termite-exception victim 'terminated #f)))
-	(process-links victim)))
+  (lambda (link)
+    (! link (make-termite-exception victim 'terminated #f)))
+  (process-links victim)))
 
 
 ;; TODO 'wait-for' and 'alive?' should be grouped in a more general
@@ -198,22 +198,22 @@
 ;; Warning: will not work on remote processes.
 (define (%wait-for pid)
   (with-exception-catcher
-	(lambda (e)
-	  (void))
-	(lambda ()
-	  (thread-join! pid)
-	  (void))))
+  (lambda (e)
+    (void))
+  (lambda ()
+    (thread-join! pid)
+    (void))))
 
 
 ;; Check whether the process 'pid' is still alive.  Warning: will not
 ;; work on remote processes.
 (define (%alive? pid)
   (with-exception-catcher
-	(lambda (e)
-	  (join-timeout-exception? e))
-	(lambda ()
-	  (thread-join! pid 0)
-	  #f)))
+  (lambda (e)
+    (join-timeout-exception? e))
+  (lambda ()
+    (thread-join! pid 0)
+    #f)))
 
 
 ;; ----------------------------------------------------------------------------
@@ -221,7 +221,7 @@
 
 ;; * Send a message 'msg' to 'pid'.  This means that the message will
 ;; be enqueued in the mailbox of the destination process.
-;; 
+;;
 ;; Delivery of the message is unreliable in theory, but in practice
 ;; local messages will always be delivered, and remote messages will
 ;; not be delivered only if the connection is currently broken to the
@@ -231,12 +231,12 @@
 ;; doesn't get there: you need to handle errors yourself.
 (define (! to msg)
   (cond
-	((process? to)
-	 (thread-send to msg))
-	((upid? to)
-	 (thread-send dispatcher (list 'relay to msg)))
-	(else
-	  (error "invalid-message-destination" to))))
+  ((process? to)
+   (thread-send to msg))
+  ((upid? to)
+   (thread-send dispatcher (list 'relay to msg)))
+  (else
+    (error "invalid-message-destination" to))))
 
 
 ;; ----------------------------------------------------------------------------
@@ -253,19 +253,19 @@
 ;; value instead of raising an exception.
 (define (? . opt) ;; TODO: inefficient, fix
   (match opt
-	(()
-	 (recv
-	   (msg msg)))
+  (()
+   (recv
+     (msg msg)))
 
-	((timeout)
-	 (recv
-	   (msg msg)
-	   (after timeout (thread-receive 0))))
+  ((timeout)
+   (recv
+     (msg msg)
+     (after timeout (thread-receive 0))))
 
-	((timeout default)
-	 (recv
-	   (msg msg)
-	   (after timeout default)))))
+  ((timeout default)
+   (recv
+     (msg msg)
+     (after timeout default)))))
 
 
 ;; benchmark to see if faster...
@@ -289,19 +289,19 @@
 ;; TODO: inefficient, fix
 (define (?? pred? . opt)
   (match opt
-	(()
-	 (recv
-	   (msg (where (pred? msg)) msg)))
+  (()
+   (recv
+     (msg (where (pred? msg)) msg)))
 
-	((timeout)
-	 (recv
-	   (msg (where (pred? msg)) msg)
-	   (after timeout (thread-receive 0))))
+  ((timeout)
+   (recv
+     (msg (where (pred? msg)) msg)
+     (after timeout (thread-receive 0))))
 
-	((timeout default)
-	 (recv
-	   (msg (where (pred? msg)) msg)
-	   (after timeout default)))))
+  ((timeout default)
+   (recv
+     (msg (where (pred? msg)) msg)
+     (after timeout default)))))
 
 
 ;; ----------------------------------------------------------------------------
@@ -320,22 +320,22 @@
 ;; RPC
 (define (!? pid msg . opt)
   (let ((tag (make-tag)))
-	(! pid (list (self) tag msg))
+  (! pid (list (self) tag msg))
 
-	(match opt
-	  (()
-	   (recv
-		 ((,tag reply) reply)))
+  (match opt
+    (()
+     (recv
+     ((,tag reply) reply)))
 
-	  ((timeout)
-	   (recv
-		 ((,tag reply) reply)
-		 (after timeout (raise 'timeout))))
+    ((timeout)
+     (recv
+     ((,tag reply) reply)
+     (after timeout (raise 'timeout))))
 
-	  ((timeout default)
-	   (recv
-		 ((,tag reply) reply)
-		 (after timeout default))))))
+    ((timeout default)
+     (recv
+     ((,tag reply) reply)
+     (after timeout default))))))
 
 
 ;; * Evaluate a 'thunk' on a remote node and return the result of that
@@ -343,12 +343,12 @@
 ;; specify a 'timeout' and a 'default' argument.
 (define (on node thunk)
   (let ((tag (make-tag))
-		(from (self)))
-	(remote-spawn node
-				  (lambda ()
-					(! from (list tag (thunk)))))
-	(recv
-	  ((,tag reply) reply))))
+    (from (self)))
+  (remote-spawn node
+          (lambda ()
+          (! from (list tag (thunk)))))
+  (recv
+    ((,tag reply) reply))))
 
 
 ;; ----------------------------------------------------------------------------
@@ -370,8 +370,8 @@
 ;; propagated to the remote process.
 (define (outbound-link pid)
   (let* ((links (process-links (self))))
-	(if (not (memq pid links))
-		(process-links-set! (self) (cons pid links)))))
+  (if (not (memq pid links))
+    (process-links-set! (self) (cons pid links)))))
 
 
 ;; * Link bidirectionally the current process with another process
@@ -400,41 +400,41 @@
 ;; Start a process representing a Gambit output port.
 (define (spawn-output-port port #!optional (serialize? #f))
   (output-port-readtable-set!
-	port
-	(readtable-sharing-allowed?-set
-	  (output-port-readtable port)
-	  serialize?))
+  port
+  (readtable-sharing-allowed?-set
+    (output-port-readtable port)
+    serialize?))
 
   (make-termite-output-port
-	(spawn
-	  (lambda ()
-		(let loop ()
-		  (recv
-			(proc
-			  (where (procedure? proc))
-			  (proc port))
-			(x (warning "unknown message sent to output port: " x)))
-		  (loop)))
+  (spawn
+    (lambda ()
+    (let loop ()
+      (recv
+      (proc
+        (where (procedure? proc))
+        (proc port))
+      (x (warning "unknown message sent to output port: " x)))
+      (loop)))
       name: 'termite-output-port)))
 
 ;; Start a process representing a Gambit input port.
 (define (spawn-input-port port #!optional (serialize? #f))
   (input-port-readtable-set!
-	port
-	(readtable-sharing-allowed?-set
-	  (input-port-readtable port)
-	  serialize?))
+  port
+  (readtable-sharing-allowed?-set
+    (input-port-readtable port)
+    serialize?))
 
   (make-termite-input-port
-	(spawn
-	  (lambda ()
-		(let loop ()
-		  (recv
-			((from token proc)
-			 (where (procedure? proc))
-			 (! from (list token (proc port))))
-			(x (warning "unknown message sent to input port: " x)))
-		  (loop)))
+  (spawn
+    (lambda ()
+    (let loop ()
+      (recv
+      ((from token proc)
+       (where (procedure? proc))
+       (! from (list token (proc port))))
+      (x (warning "unknown message sent to input port: " x)))
+      (loop)))
       name: 'termite-input-port)))
 
 ;; IO parameterization
@@ -452,29 +452,29 @@
 (define (pid->upid obj)
   (mutex-lock! *global-mutex*)
   (cond
-	((table-ref *local->foreign* obj #f)
-	 => (lambda (x)
-		  (mutex-unlock! *global-mutex*)
-		  x))
-	(else
-	  (let ((upid (make-upid (make-uuid) (current-node))))
-		(table-set! *local->foreign* obj upid)
-		(table-set! *foreign->local* upid obj)
-		(mutex-unlock! *global-mutex*)
-		upid))))
+  ((table-ref *local->foreign* obj #f)
+   => (lambda (x)
+      (mutex-unlock! *global-mutex*)
+      x))
+  (else
+    (let ((upid (make-upid (make-uuid) (current-node))))
+    (table-set! *local->foreign* obj upid)
+    (table-set! *foreign->local* upid obj)
+    (mutex-unlock! *global-mutex*)
+    upid))))
 
 (define (tag->utag obj)
   (mutex-lock! *global-mutex*)
   (cond
-	((tag-uuid obj)
-	 (mutex-unlock! *global-mutex*)
-	 obj)
-	(else
-	  (let ((uuid (make-uuid)))
-		(tag-uuid-set! obj uuid)
-		(table-set! *uuid->tag* uuid obj)
-		(mutex-unlock! *global-mutex*)
-		obj))))
+  ((tag-uuid obj)
+   (mutex-unlock! *global-mutex*)
+   obj)
+  (else
+    (let ((uuid (make-uuid)))
+    (tag-uuid-set! obj uuid)
+    (table-set! *uuid->tag* uuid obj)
+    (mutex-unlock! *global-mutex*)
+    obj))))
 
 ;; Some debuging info
 (define proxy-counter 0)
@@ -523,7 +523,7 @@
 (let ()
   ;; Add termite methods
   (define env '())
-  
+
   (define (register proc-name proc)
     (cond
       ((assoc proc-name env)
@@ -540,7 +540,7 @@
       (lambda (v)
         (println "≡> " (car v)))
       env))
- 
+
   (define-macro (macro-create-param param-name min-value default-value)
     (let ((setter-name (##symbol-append param-name '- 'set!))
           (msg (string-append
@@ -656,7 +656,7 @@
        (transform obj len depth (lambda (obj) (make-proxy (make-element-proxy obj)))))
 
       ;; unserializable objects, so instead of crashing we set them to #f
-      ((or (port? obj)) 
+      ((or (port? obj))
        #f)
 
       (else obj)))
@@ -672,7 +672,7 @@
     (register "max-norm-set!" max-norm-set!)
     (register "ls-transform" ls-transform)
     (register "set-transform!" set-transform!)))
-      
+
 ;;;; OLD VERSION
 ; (define max-length-get #f)
 ; (define max-length-set! #f)
@@ -682,69 +682,69 @@
 ; (define serialize-hook #f)
 ; (define set-lazy-transform! #f)
 ; (define set-current-heuristic! #f)
-; 
-; 
+;
+;
 ; (let ((max-length 20)
 ;       (max-depth 5)
 ;       (max-norme 50))
-; 
+;
 ;   (define (heuristic-1 len depth)
 ;     (or (> len max-length)
 ;         (> depth max-depth)))
-; 
+;
 ;   (define heuristic-2
 ;     (lambda (len depth)
 ;       (let ((norm (sqrt (* len len)
 ;                         (* depth depth))))
 ;         (> norm max-norm))))
-; 
+;
 ;   (define heursistic-list
 ;     (list heuristic-1 heuristic-2))
-; 
+;
 ;   (define current-heuristic heuristic-1)
-; 
+;
 ;   (define (lazy-tranform obj len depth)
 ;     (if (current-heuristic len depth)
 ;       (make-proxy (make-element-proxy obj))
 ;       obj))
-; 
+;
 ;   ;; Identity
 ;   (define (id-transform obj l d) obj)
-; 
+;
 ;   (define transform lazy-tranform)
-; 
+;
 ;   (set! set-current-heuristic!
 ;     (lambda (idx)
 ;       (list-ref heursistic-list idx)))
-; 
+;
 ;   (set! set-lazy-transform!
 ;     (lambda (flag)
 ;       (if flag
 ;         (set! transform lazy-tranform)
 ;         (set! transform id-transform))))
-; 
+;
 ;   (set! max-length-get (lambda () max-length))
-; 
+;
 ;   (set! max-length-set!
 ;     (lambda (x)
 ;       (if (< x 6)
 ;         (error "Invalid length " x)
 ;         (set! max-length x))))
-;   
+;
 ;   (set! max-depth-get (lambda () max-depth))
-; 
+;
 ;   (set! max-depth-set!
 ;     (lambda (x)
 ;       (if (< x 1)
 ;         (error "Invalid depth " x)
 ;         (set! max-depth x))))
-; 
+;
 ;   (set! max-norme-set!
 ;     (lambda (x)
 ;       (if (< x 6)
 ;         (error "Invalid max-norme " x)
 ;         (set! max-norme x))))
-; 
+;
 ;   (set! serialize-hook
 ;     (lambda (obj len depth)
 ;       ;(println "Serialize-hook: " (object->string obj 255))
@@ -756,19 +756,19 @@
 ;              (if thunk
 ;                (make-proxy-callback thunk)
 ;                (##promise-result obj)))))
-; 
+;
 ;         ((proxy? obj)
 ;          (let ((pid (proxy-upid obj)))
 ;            (begin
 ;              (proxy-upid-set! obj pid)
 ;              obj)))
-; 
+;
 ;         ((process? obj)
 ;          (pid->upid obj))
-; 
+;
 ;         ((tag? obj)
 ;          (tag->utag obj))
-;         
+;
 ;         ; Identify builtin procedure.
 ;         ;((procedure? obj)
 ;         ; (let ((name (##procedure-name obj)))
@@ -781,34 +781,34 @@
 ;         ;           (> depth max-depth))
 ;         ;       (make-proxy (make-element-proxy obj))
 ;         ;       obj))))
-;              
-;         
+;
+;
 ;         ((pair? obj)
 ;          (transform obj len depth))
-;         
+;
 ;         ;; unserializable objects, so instead of crashing we set them to #f
-;         ((or (port? obj)) 
+;         ((or (port? obj))
 ;          #f)
-; 
+;
 ;         (else obj)))))
 
 (define (upid->pid obj)
   (cond
-	((table-ref *foreign->local* obj #f)
-	 => (lambda (pid) pid))
-	((and (symbol? (upid-tag obj))
-		  (resolve-service (upid-tag obj)))
-	 => (lambda (pid) 
-		  pid))
-	(else
-	  (error "don't know how to upid->pid"))))
+  ((table-ref *foreign->local* obj #f)
+   => (lambda (pid) pid))
+  ((and (symbol? (upid-tag obj))
+      (resolve-service (upid-tag obj)))
+   => (lambda (pid)
+      pid))
+  (else
+    (error "don't know how to upid->pid"))))
 
 (define (utag->tag obj)
   (let ((uuid (tag-uuid obj)))
-	(cond
-	  ((table-ref *uuid->tag* uuid #f)
-	   => (lambda (tag) tag))
-	  (else obj))))
+  (cond
+    ((table-ref *uuid->tag* uuid #f)
+     => (lambda (tag) tag))
+    (else obj))))
 
 (define (deserialize-hook obj)
   (cond
@@ -834,62 +834,62 @@
 (define (serialize obj port)
   (let* ((serialized-obj
             (lazy-object->u8vector obj serialize-hook))
-		 (len
-		   (u8vector-length serialized-obj))
-		 (serialized-len
-		   (u8vector (bitwise-and len #xff)
-					 (bitwise-and (arithmetic-shift len -8) #xff)
-					 (bitwise-and (arithmetic-shift len -16) #xff)
-					 (bitwise-and (arithmetic-shift len -24) #xff))))
+     (len
+       (u8vector-length serialized-obj))
+     (serialized-len
+       (u8vector (bitwise-and len #xff)
+           (bitwise-and (arithmetic-shift len -8) #xff)
+           (bitwise-and (arithmetic-shift len -16) #xff)
+           (bitwise-and (arithmetic-shift len -24) #xff))))
 
-	(begin
-	  (write-subu8vector serialized-len 0 4 port)
-	  (write-subu8vector serialized-obj 0 len port))))
+  (begin
+    (write-subu8vector serialized-len 0 4 port)
+    (write-subu8vector serialized-obj 0 len port))))
 
 
 (define (deserialize port)
   (let* ((serialized-len
-		   (u8vector 0 0 0 0))
-		 (n
-		   (read-subu8vector serialized-len 0 4 port)))
+       (u8vector 0 0 0 0))
+     (n
+       (read-subu8vector serialized-len 0 4 port)))
 
-	(cond ((= 0 n)
-		   #!eof)
-		  ((not (= 4 n))
-		   (error "deserialization error"))
-		  (else
-			(let* ((len
-					 (+ (u8vector-ref serialized-len 0)
-						(arithmetic-shift (u8vector-ref serialized-len 1) 8)
-						(arithmetic-shift (u8vector-ref serialized-len 2) 16)
-						(arithmetic-shift (u8vector-ref serialized-len 3) 24)))
-				   (serialized-obj
-					 (make-u8vector len))
-				   (n
-					 (read-subu8vector serialized-obj 0 len port)))
+  (cond ((= 0 n)
+       #!eof)
+      ((not (= 4 n))
+       (error "deserialization error"))
+      (else
+      (let* ((len
+           (+ (u8vector-ref serialized-len 0)
+            (arithmetic-shift (u8vector-ref serialized-len 1) 8)
+            (arithmetic-shift (u8vector-ref serialized-len 2) 16)
+            (arithmetic-shift (u8vector-ref serialized-len 3) 24)))
+           (serialized-obj
+           (make-u8vector len))
+           (n
+           (read-subu8vector serialized-obj 0 len port)))
 
-			  (if (not (eqv? len n))
-				  (begin
-					(error "deserialization error"
-						   (list len: len n: n)))
-				  (let ((obj (u8vector->object serialized-obj deserialize-hook)))
-					(if (vector? obj)
-						(vector->list obj)
-						obj))))))))
+        (if (not (eqv? len n))
+          (begin
+          (error "deserialization error"
+               (list len: len n: n)))
+          (let ((obj (u8vector->object serialized-obj deserialize-hook)))
+          (if (vector? obj)
+            (vector->list obj)
+            obj))))))))
 
 (define (start-serializing-output-port port)
   (spawn-link
-	(lambda ()
-	  (let loop ()
-		(recv
-		  (('write data)
-		   ;; (debug out: data)
-		   (serialize data port)
-		   (force-output port)) ;; io override
+  (lambda ()
+    (let loop ()
+    (recv
+      (('write data)
+       ;; (debug out: data)
+       (serialize data port)
+       (force-output port)) ;; io override
 
-		  (msg
-			(warning "serializing-output-port ignored message: " msg)))
-		(loop)))
+      (msg
+      (warning "serializing-output-port ignored message: " msg)))
+    (loop)))
     name: 'termite-serializing-output-port))
 
 
@@ -911,14 +911,14 @@
 ;; requests, and call ON-CONNECT to deal with those new connections.
 (define (start-tcp-server tcp-port-number on-connect)
   (let ((tcp-server-port
-		  (open-tcp-server (list
-							 port-number: tcp-port-number
-							 coalesce: #f))))
-	(spawn
-	  (lambda ()
-		(let loop () 
-		  (on-connect (read tcp-server-port)) ;; io override
-		  (loop)))
+      (open-tcp-server (list
+               port-number: tcp-port-number
+               coalesce: #f))))
+  (spawn
+    (lambda ()
+    (let loop ()
+      (on-connect (read tcp-server-port)) ;; io override
+      (loop)))
       name: 'termite-tcp-server)))
 
 
@@ -955,43 +955,43 @@
 (define (start-messenger socket)
   ;; (print "INBOUND connection established\n")
   (spawn
-	(lambda ()
-	  (with-exception-catcher
-		(lambda (e)
-		  (! dispatcher (list 'unregister (self)))
-		  (shutdown!))
+  (lambda ()
+    (with-exception-catcher
+    (lambda (e)
+      (! dispatcher (list 'unregister (self)))
+      (shutdown!))
 
-		(lambda ()
-		  (let ((in  (start-serializing-active-input-port socket (self)))
-				(out (start-serializing-output-port socket)))
-			(recv
-			  ((,in node)
-			   ;; registering messenger to local dispatcher
-			   (! dispatcher (list 'register (self) node))
-			   (messenger-loop node in out)))))))
+    (lambda ()
+      (let ((in  (start-serializing-active-input-port socket (self)))
+        (out (start-serializing-output-port socket)))
+      (recv
+        ((,in node)
+         ;; registering messenger to local dispatcher
+         (! dispatcher (list 'register (self) node))
+         (messenger-loop node in out)))))))
     name: 'termite-inbound-messenger))
 
 
 (define (messenger-loop node in out)
   (recv
-	;; incoming message
-	((,in ('relay id message))
-	 (let ((to (upid->pid (make-upid id (current-node)))))
-	   (! to message)))
+  ;; incoming message
+  ((,in ('relay id message))
+   (let ((to (upid->pid (make-upid id (current-node)))))
+     (! to message)))
 
-	;; outgoing message
-	(('relay to message)
-	 ;; 'to' is a upid
-	 (let ((id (upid-tag to))
-			;; (node (upid-node to))
-			;; (host (node-host node))
-			;; (port (node-id node))
-			)
-	   (! out (list 'write (list 'relay id message)))))
+  ;; outgoing message
+  (('relay to message)
+   ;; 'to' is a upid
+   (let ((id (upid-tag to))
+      ;; (node (upid-node to))
+      ;; (host (node-host node))
+      ;; (port (node-id node))
+      )
+     (! out (list 'write (list 'relay id message)))))
 
-	;; unknown message
-	(msg
-	  (warning "messenger-loop ignored message: " msg)))
+  ;; unknown message
+  (msg
+    (warning "messenger-loop ignored message: " msg)))
 
   (messenger-loop node in out))
 
@@ -999,40 +999,40 @@
 ;; the DISPATCHER dispatches messages to the right MESSENGER, it keeps
 ;; track of known remote nodes
 (define dispatcher
-  (spawn 
-	(lambda () 
-	  ;; the KNOWN-NODES of the DISPATCHER LOOP is an a-list of NODE => MESSENGER
-	  (let loop ((known-nodes '()))
-		(recv
-		  (('register messenger node)
-		   (loop (cons (cons node messenger) known-nodes)))
+  (spawn
+  (lambda ()
+    ;; the KNOWN-NODES of the DISPATCHER LOOP is an a-list of NODE => MESSENGER
+    (let loop ((known-nodes '()))
+    (recv
+      (('register messenger node)
+       (loop (cons (cons node messenger) known-nodes)))
 
-		  (('unregister messenger)
-		   (loop (remove (lambda (m) (equal? (cdr m) messenger)) known-nodes)))
+      (('unregister messenger)
+       (loop (remove (lambda (m) (equal? (cdr m) messenger)) known-nodes)))
 
-		  (('relay upid message)
-		   (let ((node (upid-node upid)))
-			 (cond
-			   ;; the message should be sent locally (ideally should not happen 
-			   ;; for performance reasons, but if the programmer wants to do 
-			   ;; that, then OK...)
-			   ((equal? node (current-node))
+      (('relay upid message)
+       (let ((node (upid-node upid)))
+       (cond
+         ;; the message should be sent locally (ideally should not happen
+         ;; for performance reasons, but if the programmer wants to do
+         ;; that, then OK...)
+         ((equal? node (current-node))
           (! (upid->pid upid) message)
           (loop known-nodes))
 
-			   ;; the message is destined to a pid on a known node
-			   ((assoc node known-nodes)
-				=> (lambda (messenger)
-					 (! (cdr messenger) (list 'relay upid message))
-					 (loop known-nodes)))
+         ;; the message is destined to a pid on a known node
+         ((assoc node known-nodes)
+        => (lambda (messenger)
+           (! (cdr messenger) (list 'relay upid message))
+           (loop known-nodes)))
 
-			   ;; unconnected node, must connect
-			   (else
-				 (let ((messenger (initiate-messenger node)))
-				   (! messenger (list 'relay upid message))
-				   (loop (cons (cons node messenger) known-nodes)))))))
+         ;; unconnected node, must connect
+         (else
+         (let ((messenger (initiate-messenger node)))
+           (! messenger (list 'relay upid message))
+           (loop (cons (cons node messenger) known-nodes)))))))
 
-		  (msg
+      (msg
         (warning "dispatcher ignored message: " msg) ;; uh...
         (loop known-nodes)))))
     name: 'termite-dispatcher))
@@ -1044,21 +1044,21 @@
 ;; LINKER (to establish exception-propagation links between processes)
 (define linker
   (spawn
-	(lambda ()
-	  (let loop ()
-		(recv
-		  (('link from to)
-		   (cond
-			 ((process? from)
-			  (process-links-set! from (cons to (process-links from)))) ;;;;;;;;;;
-			 ((upid? from)
-			  (! (remote-service 'linker (upid-node from))
-				 (list 'link from to)))
-			 (else
-			   (warning "in linker-loop: unknown object"))))
-		  (msg
-			(warning "linker ignored message: " msg)))
-		(loop)))
+  (lambda ()
+    (let loop ()
+    (recv
+      (('link from to)
+       (cond
+       ((process? from)
+        (process-links-set! from (cons to (process-links from)))) ;;;;;;;;;;
+       ((upid? from)
+        (! (remote-service 'linker (upid-node from))
+         (list 'link from to)))
+       (else
+         (warning "in linker-loop: unknown object"))))
+      (msg
+      (warning "linker ignored message: " msg)))
+    (loop)))
     name: 'termite-linker))
 
 
@@ -1066,40 +1066,40 @@
 ;; the SPAWNER answers remote-spawn request
 (define spawner
   (spawn
-	(lambda ()
-	  (let loop ()
-		(recv
-		  ((from tag ('spawn thunk links name))
-		   (! from (list tag (spawn thunk links: links name: name))))
+  (lambda ()
+    (let loop ()
+    (recv
+      ((from tag ('spawn thunk links name))
+       (! from (list tag (spawn thunk links: links name: name))))
 
-		  (msg
-			(warning "spawner ignored message: " msg)))
-		(loop)))
+      (msg
+      (warning "spawner ignored message: " msg)))
+    (loop)))
     name: 'termite-spawner))
 
 
 ;; the PUBLISHER is used to implement a mutable global env. for
 ;; process names
 (define publisher
-  (spawn 
-	(lambda ()
-	  (define dict (make-dict))
+  (spawn
+  (lambda ()
+    (define dict (make-dict))
 
-	  (let loop ()
-		(recv
-		  (('publish name pid)
-		   (dict-set! dict name pid))
+    (let loop ()
+    (recv
+      (('publish name pid)
+       (dict-set! dict name pid))
 
-		  (('unpublish name pid)
-		   (dict-set! dict name))
+      (('unpublish name pid)
+       (dict-set! dict name))
 
-		  ((from tag ('resolve name))
-		   (! from (list tag (dict-ref dict name))))
+      ((from tag ('resolve name))
+       (! from (list tag (dict-ref dict name))))
 
-		  (msg
-			(warning "puslisher ignored message: " msg)))
+      (msg
+      (warning "puslisher ignored message: " msg)))
 
-		(loop)))
+    (loop)))
     name: 'termite-publisher))
 
 (define (publish-service name pid)
@@ -1137,20 +1137,20 @@
 ;; Task moves away, lose identity
 (define (migrate-task node)
   (call/cc
-	(lambda (k)
-	  (remote-spawn node (lambda () (k #t)))
-	  (halt!))))
+  (lambda (k)
+    (remote-spawn node (lambda () (k #t)))
+    (halt!))))
 
 ;; Task moves away, leave a proxy behind
 (define (migrate/proxy node)
   (define (proxy pid)
-	(let loop ()
-	  (! pid (?))
-	  (loop)))
+  (let loop ()
+    (! pid (?))
+    (loop)))
   (call/cc
-	(lambda (k)
-	  (proxy
-		(remote-spawn-link node (lambda () (k #t)))))))
+  (lambda (k)
+    (proxy
+    (remote-spawn-link node (lambda () (k #t)))))))
 
 
 ;; ----------------------------------------------------------------------------
@@ -1180,21 +1180,21 @@
 
 (define file-output-log-handler
   (make-event-handler
-	;; init
-	(lambda (args)
-	  (match args
-		((filename) 
+  ;; init
+  (lambda (args)
+    (match args
+    ((filename)
          (open-output-file (list path: filename
                                  create: 'maybe
                                  append: #t)))))
-	;; event
-	report-event
-	;; call
-	(lambda (term port)
-	  (values (void) port))
-	;; shutdown
-	(lambda (reason port)
-	  (close-output-port port))))
+  ;; event
+  report-event
+  ;; call
+  (lambda (term port)
+    (values (void) port))
+  ;; shutdown
+  (lambda (reason port)
+    (close-output-port port))))
 
 
 ;; 'type' is a keyword (error warning info debug)
@@ -1210,27 +1210,27 @@
 (define (debug . terms)
   (termite-log 'debug terms))
 
-(define logger 
+(define logger
   (let ((logger (event-manager:start name: 'termite-logger)))
-	(event-manager:add-handler logger
-							   (make-simple-event-handler
-								 report-event
-								 (current-error-port)))
-	(event-manager:add-handler logger
-							   file-output-log-handler
-							   "_termite.log")
-	logger))
+  (event-manager:add-handler logger
+                 (make-simple-event-handler
+                 report-event
+                 (current-error-port)))
+  (event-manager:add-handler logger
+                 file-output-log-handler
+                 "_termite.log")
+  logger))
 
 
 (define ping-server
-  (spawn 
-	(lambda ()
-	  (let loop ()
-		(recv
-		  ((from tag 'ping) 
-		   (! from (list tag 'pong)))
-		  (msg (debug "ping-server ignored message" msg)))
-		(loop)))
+  (spawn
+  (lambda ()
+    (let loop ()
+    (recv
+      ((from tag 'ping)
+       (! from (list tag 'pong)))
+      (msg (debug "ping-server ignored message" msg)))
+    (loop)))
     name: 'termite-ping-server))
 
 (define (ping node #!optional (timeout 1.0))
@@ -1250,7 +1250,7 @@
 (define (publish-external-services)
   ;; --------------------
   ;; Services
-  
+
   ;; publishing the accessible exterior services
   ;; (essentially, opening the node to other nodes)
   (publish-service 'spawner spawner)
