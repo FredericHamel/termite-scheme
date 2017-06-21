@@ -153,8 +153,8 @@
 (define (remote-spawn node thunk #!key (links '()) (name 'anonymous-remote))
   (if (equal? node (current-node))
 	  (spawn thunk links: links name: name)
-	  (!? (remote-service 'spawner node)
-		  (list 'spawn thunk links name))))
+    (!? (remote-service 'spawner node)
+      (list 'spawn thunk links name))))
 
 
 ;; * Start a new process on remote node 'node', with a bidirectional
@@ -480,6 +480,11 @@
 (define proxy-counter 0)
 (define proxy-request-counter 0)
 
+;; Reset both counter
+(define (proxy-reset-counter)
+  (set! proxy-counter 0)
+  (set! proxy-request-counter 0))
+
 ;; Print debugging info
 (define (proxy-print-debugging-info)
   (println "---- PROXY INFO HEADER ----")
@@ -511,90 +516,281 @@
     (macro-inc proxy-counter)
     (pid->upid proxy-thread)))
 
-(define max-length-set! #f)
-(define max-depth-set! #f)
+;;;; NEW VERSION
+(define termite-modules #f)
 (define serialize-hook #f)
-(define set-lazy-transform! #f)
 
-(let ((max-length 20)
-      (max-depth 5))
-  (define (lazy-tranform obj len depth)
+(let ()
+  ;; Add termite methods
+  (define env '())
+  
+  (define (register proc-name proc)
+    (cond
+      ((assoc proc-name env)
+       => (lambda (v)
+            (set-cdr! v proc)))
+      (else
+        (set! env
+          (cons
+            (cons proc-name proc)
+            env)))))
+
+  (define (ls-functions)
+    (for-each
+      (lambda (v)
+        (println "≡> " (car v)))
+      env))
+ 
+  (define-macro (macro-create-param param-name min-value default-value)
+    (let ((setter-name (##symbol-append param-name '- 'set!))
+          (msg (string-append
+                 "expected param-value greater than "
+                 (number->string min-value) " for "
+                 (symbol->string param-name))))
+      (if (< default-value min-value)
+        (erreur msg)
+        `(begin
+           (define ,param-name ,default-value)
+           (define (,setter-name value)
+             (if (< value ,min-value)
+               (error ,msg)
+               (set! ,param-name value)))))))
+
+  (macro-create-param max-depth 1 1)
+  (macro-create-param max-length 6 20)
+  (macro-create-param max-norm 6 20)
+
+  (define (id-transform obj len depth callback) obj)
+
+  ;; Depth length distance.
+  (define (tree-depth-transform obj len depth callback)
     (if (or (> len max-length)
             (> depth max-depth))
-      (make-proxy (make-element-proxy obj))
+      (callback obj)
       obj))
 
-  ;; Identity
-  (define (id-transform obj l d) obj)
+  ;; Distance from object origin
+  (define (norm-tranform obj len depth callback)
+    (let ((norm (sqrt (+ (* len len)
+                         (* depth depth)))))
+      (if (> norm max-norm)
+        (callback obj)
+        obj)))
 
-  (define transform lazy-tranform)
+  ;; List of available transform
+  (define list-transform
+    (list
+      (cons "id-transform" id-transform)
+      (cons "tree-depth-transform" tree-depth-transform)
+      (cons "norm-tranform" norm-tranform)))
 
-  (set! set-lazy-transform!
-    (lambda (flag)
-      (if flag
-        (set! transform lazy-tranform)
-        (set! transform id-transform))))
+  ;; Current transform
+  (define transform id-transform)
 
-  (set! max-length-set!
-    (lambda (x)
-      (if (< x 6)
-        (error "Invalid length " x)
-        (set! max-length x))))
-  (set! max-depth-set!
-    (lambda (x)
-      (if (< x 1)
-        (error "Invalid depth " x)
-        (set! max-depth x))))
-  (set! serialize-hook
-    (lambda (obj len depth)
-      ;(println "Serialize-hook: " (object->string obj 255))
-      (cond
-        ;; Unpack promise instead of force
-        ((##promise? obj)
+  ;; Show available and current transform used.
+  (define (ls-transform)
+    (let ((x #t))
+      (for-each
+        (lambda (obj)
+          (println "≡> " (car obj)
+                   (if (eq? (cdr obj) transform)
+                     (begin
+                       (set! x #f) " (*)") "")))
+        list-transform)
+      (println "≡> user-transform " (if x " (*)" ""))))
+
+  ;; Thunk/string
+  (define (set-transform! obj)
+    (cond
+      ((procedure? obj)
+       (set! transform obj))
+      ((and (string? obj)
+            (assoc obj list-transform))
+       => (lambda (thunk)
+            (set! transform (cdr thunk))))
+      (else
+        (error "Function " obj " not available"))))
+
+  (define (inner-termite-modules msg)
+    (cond
+      ((assoc msg env) => cdr)
+      (else (error "No such service '" msg "'"))))
+
+  (define (inner-serialize-hook obj len depth)
+    (cond
+      ;; Unpack promise instead of force
+      ((##promise? obj)
+       (begin
+         (let ((thunk (##promise-thunk obj)))
+           (if thunk
+             (make-proxy-callback thunk)
+             (##promise-result obj)))))
+
+      ((proxy? obj)
+       (let ((pid (proxy-upid obj)))
          (begin
-           (let ((thunk (##promise-thunk obj)))
-             (if thunk
-               (make-proxy-callback thunk)
-               (##promise-result obj)))))
+           (proxy-upid-set! obj pid)
+           obj)))
 
-        ((proxy? obj)
-         (let ((pid (force (proxy-upid obj))))
-           (begin
-             (proxy-upid-set! obj pid)
-             obj)))
+      ((process? obj)
+       (pid->upid obj))
 
-        ((process? obj)
-         (pid->upid obj))
+      ((tag? obj)
+       (tag->utag obj))
 
-        ((tag? obj)
-         (tag->utag obj))
-        
-        ;; Do not replace vector with promise
-        ;((vector? obj)
-        ; obj)
+      ; Identify builtin procedure.
+      ;((procedure? obj)
+      ; (let ((name (##procedure-name obj)))
+      ;   (if (and name
+      ;            (not (char=? (string-ref (symbol->string name) 1)
+      ;                    #\#)))
+      ;     obj
+      ;     (if (or
+      ;           (> len max-length)
+      ;           (> depth max-depth))
+      ;       (make-proxy (make-element-proxy obj))
+      ;       obj))))
 
-        ; Identify builtin procedure.
-        ;((procedure? obj)
-        ; (let ((name (##procedure-name obj)))
-        ;   (if (and name
-        ;            (not (char=? (string-ref (symbol->string name) 1)
-        ;                    #\#)))
-        ;     obj
-        ;     (if (or
-        ;           (> len max-length)
-        ;           (> depth max-depth))
-        ;       (make-proxy (make-element-proxy obj))
-        ;       obj))))
-             
-        
-        ((pair? obj)
-         (transform obj len depth))
-        
-        ;; unserializable objects, so instead of crashing we set them to #f
-        ((or (port? obj)) 
-         #f)
 
-        (else obj)))))
+      ((pair? obj)
+       (transform obj len depth (lambda (obj) (make-proxy (make-element-proxy obj)))))
+
+      ;; unserializable objects, so instead of crashing we set them to #f
+      ((or (port? obj)) 
+       #f)
+
+      (else obj)))
+
+  ;; Register codes
+  (begin
+    (set! termite-modules inner-termite-modules)
+    (set! serialize-hook inner-serialize-hook)
+    (register "register" register)
+    (register "ls-functions" ls-functions)
+    (register "max-depth-set!" max-depth-set!)
+    (register "max-length-set!" max-length-set!)
+    (register "max-norm-set!" max-norm-set!)
+    (register "ls-transform" ls-transform)
+    (register "set-transform!" set-transform!)))
+      
+;;;; OLD VERSION
+; (define max-length-get #f)
+; (define max-length-set! #f)
+; (define max-depth-get #f)
+; (define max-depth-set! #f)
+; (define max-norme-set! #f)
+; (define serialize-hook #f)
+; (define set-lazy-transform! #f)
+; (define set-current-heuristic! #f)
+; 
+; 
+; (let ((max-length 20)
+;       (max-depth 5)
+;       (max-norme 50))
+; 
+;   (define (heuristic-1 len depth)
+;     (or (> len max-length)
+;         (> depth max-depth)))
+; 
+;   (define heuristic-2
+;     (lambda (len depth)
+;       (let ((norm (sqrt (* len len)
+;                         (* depth depth))))
+;         (> norm max-norm))))
+; 
+;   (define heursistic-list
+;     (list heuristic-1 heuristic-2))
+; 
+;   (define current-heuristic heuristic-1)
+; 
+;   (define (lazy-tranform obj len depth)
+;     (if (current-heuristic len depth)
+;       (make-proxy (make-element-proxy obj))
+;       obj))
+; 
+;   ;; Identity
+;   (define (id-transform obj l d) obj)
+; 
+;   (define transform lazy-tranform)
+; 
+;   (set! set-current-heuristic!
+;     (lambda (idx)
+;       (list-ref heursistic-list idx)))
+; 
+;   (set! set-lazy-transform!
+;     (lambda (flag)
+;       (if flag
+;         (set! transform lazy-tranform)
+;         (set! transform id-transform))))
+; 
+;   (set! max-length-get (lambda () max-length))
+; 
+;   (set! max-length-set!
+;     (lambda (x)
+;       (if (< x 6)
+;         (error "Invalid length " x)
+;         (set! max-length x))))
+;   
+;   (set! max-depth-get (lambda () max-depth))
+; 
+;   (set! max-depth-set!
+;     (lambda (x)
+;       (if (< x 1)
+;         (error "Invalid depth " x)
+;         (set! max-depth x))))
+; 
+;   (set! max-norme-set!
+;     (lambda (x)
+;       (if (< x 6)
+;         (error "Invalid max-norme " x)
+;         (set! max-norme x))))
+; 
+;   (set! serialize-hook
+;     (lambda (obj len depth)
+;       ;(println "Serialize-hook: " (object->string obj 255))
+;       (cond
+;         ;; Unpack promise instead of force
+;         ((##promise? obj)
+;          (begin
+;            (let ((thunk (##promise-thunk obj)))
+;              (if thunk
+;                (make-proxy-callback thunk)
+;                (##promise-result obj)))))
+; 
+;         ((proxy? obj)
+;          (let ((pid (proxy-upid obj)))
+;            (begin
+;              (proxy-upid-set! obj pid)
+;              obj)))
+; 
+;         ((process? obj)
+;          (pid->upid obj))
+; 
+;         ((tag? obj)
+;          (tag->utag obj))
+;         
+;         ; Identify builtin procedure.
+;         ;((procedure? obj)
+;         ; (let ((name (##procedure-name obj)))
+;         ;   (if (and name
+;         ;            (not (char=? (string-ref (symbol->string name) 1)
+;         ;                    #\#)))
+;         ;     obj
+;         ;     (if (or
+;         ;           (> len max-length)
+;         ;           (> depth max-depth))
+;         ;       (make-proxy (make-element-proxy obj))
+;         ;       obj))))
+;              
+;         
+;         ((pair? obj)
+;          (transform obj len depth))
+;         
+;         ;; unserializable objects, so instead of crashing we set them to #f
+;         ((or (port? obj)) 
+;          #f)
+; 
+;         (else obj)))))
 
 (define (upid->pid obj)
   (cond

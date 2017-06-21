@@ -40,12 +40,21 @@
 			  ping
         ;; Debugging proxy
         proxy-print-debugging-info
+        proxy-reset-counter
         ;; Lazyness paremeter
-        max-length-set!
-        max-depth-set!
-        set-lazy-transform!
+        termite-modules
+        ;max-length-get
+        ;max-depth-get
+        ;max-length-set!
+        ;max-depth-set!
+        ;max-norme-set!
+        ;set-lazy-transform!
+        ;set-current-heuristic!
 			  ))
 
+
+(##define-macro (macro-termite-modules func . args)
+ `((termite-modules ,func) ,@args))
 
 (##define-macro (compile-time-load filename)
   (load filename)
