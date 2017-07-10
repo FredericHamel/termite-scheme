@@ -548,7 +548,7 @@
                  (number->string min-value) " for "
                  (symbol->string param-name))))
       (if (< default-value min-value)
-        (erreur msg)
+        (error msg)
         `(begin
            (define ,param-name ,default-value)
            (define (,setter-name value)
@@ -584,6 +584,17 @@
       (cons "tree-depth-transform" tree-depth-transform)
       (cons "norm-tranform" norm-tranform)))
 
+  (define list-transform-state
+    (list
+      "<>"
+      (string-append
+        "<max-length: " (number->string max-length)
+        ", max-depth: " (number->string max-depth)
+        ">")
+      (string-append
+        "<max-norm: " (number->string max-norm)
+        ">")))
+
   ;; Current transform
   (define transform id-transform)
 
@@ -591,12 +602,13 @@
   (define (ls-transform)
     (let ((x #t))
       (for-each
-        (lambda (obj)
+        (lambda (obj state)
           (println "≡> " (car obj)
                    (if (eq? (cdr obj) transform)
                      (begin
-                       (set! x #f) " (*)") "")))
-        list-transform)
+                       (set! x #f) " (*)")
+                     '()) ", " state))
+        list-transform list-transform-state)
       (println "≡> user-transform " (if x " (*)" ""))))
 
   ;; Thunk/string
