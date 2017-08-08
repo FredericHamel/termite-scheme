@@ -1,5 +1,6 @@
 #!/bin/sh
 
+num_proc=$(nproc)
 output=(_termite.log)
 exe=()
 obj=()
@@ -44,25 +45,36 @@ c_compile_file() {
       tsic $4 $2
     fi
   fi
+  exit 0
 }
 
 c_compile() {
+  local cpt
   local out
-  local i
-  for i in ${obj[@]}; do
-    out=${i%.*}.o1
-    c_compile_file "Compiling object $i" $i $out
-    if (( $? != 0 )); then
-      exit 1
-    fi
+  local fd
+  cpt=0
+  for fd in ${obj[@]}; do
+    out=${fd%.*}.o1
+    if (( cpt >= $num_proc )); then
+      wait
+      (( cpt = 0 ))
+    fi 
+
+    c_compile_file "Compiling object $fd" $fd $out &
+    (( cpt = 1 ))
   done
   for i in "${exe[@]}"; do
     out=${i%.*}
-    c_compile_file "Compiling executable $i" $i $out -exe
-    if (( $? != 0 )); then
-      exit 1
-    fi
+    if (( cpt >= $num_proc )); then
+      wait
+      (( cpt = 0 ))
+    fi 
+    c_compile_file "Compiling executable $i" $i $out -exe &
+    (( cpt = 1 ))
   done
+
+  # Wait for all build to end.
+  wait
 }
 
 c_add_all() {
