@@ -1,0 +1,8 @@
+#!/bin/sh
+
+if (( $# == 0 )); then
+  echo "Invalid number of argument"
+  exit 1
+fi;
+
+gsc-script -prelude "(##include \"~~lib/gambit#.scm\")(##include \"~~lib/termite/termite#.scm\")(load \"~~lib/termite/termite\")" $@
