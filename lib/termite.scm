@@ -284,173 +284,47 @@
     (pid->upid proxy-thread)))
 
 ;;;; NEW VERSION
-(define termite-modules #f)
-(define serialize-hook #f)
 
-(let ()
-  ;; Add termite methods
-  (define env '())
+(define (serialize-hook obj)
+  (cond
+    ;; Unpack promise instead of force
+    ((##promise? obj)
+     (begin
+       (let ((thunk (##promise-thunk obj)))
+         (if thunk
+           (make-proxy-callback thunk)
+           (##promise-result obj)))))
 
-  (define (register proc-name proc)
-    (cond
-      ((assoc proc-name env)
-       => (lambda (v)
-            (set-cdr! v proc)))
-      (else
-        (set! env
-          (cons
-            (cons proc-name proc)
-            env)))))
-
-  (define (ls-functions)
-    (for-each
-      (lambda (v)
-        (println "≡> " (car v)))
-      env))
-
-  (define-macro (macro-create-param param-name min-value default-value)
-    (let ((setter-name (##symbol-append param-name '- 'set!))
-          (msg (string-append
-                 "expected param-value greater than "
-                 (number->string min-value) " for "
-                 (symbol->string param-name))))
-      (if (< default-value min-value)
-        (error msg)
-        `(begin
-           (define ,param-name ,default-value)
-           (define (,setter-name value)
-             (if (< value ,min-value)
-               (error ,msg)
-               (set! ,param-name value)))))))
-
-  (macro-create-param max-depth 1 1)
-  (macro-create-param max-length 6 20)
-  (macro-create-param max-norm 6 20)
-
-  (define (id-transform obj len depth callback) obj)
-
-  ;; Depth length distance.
-  (define (tree-depth-transform obj len depth callback)
-    (if (or (> len max-length)
-            (> depth max-depth))
-      (callback obj)
-      obj))
-
-  ;; Distance from object origin
-  (define (norm-tranform obj len depth callback)
-    (let ((norm (sqrt (+ (* len len)
-                         (* depth depth)))))
-      (if (> norm max-norm)
-        (callback obj)
-        obj)))
-
-  ;; List of available transform
-  (define list-transform
-    (list
-      (cons "id-transform" id-transform)
-      (cons "tree-depth-transform" tree-depth-transform)
-      (cons "norm-tranform" norm-tranform)))
-
-  (define list-transform-state
-    (list
-      "<>"
-      (string-append
-        "<max-length: " (number->string max-length)
-        ", max-depth: " (number->string max-depth)
-        ">")
-      (string-append
-        "<max-norm: " (number->string max-norm)
-        ">")))
-
-  ;; Current transform
-  (define transform id-transform)
-
-  ;; Show available and current transform used.
-  (define (ls-transform)
-    (let ((x #t))
-      (for-each
-        (lambda (obj state)
-          (println "≡> " (car obj)
-                   (if (eq? (cdr obj) transform)
-                     (begin
-                       (set! x #f) " (*)")
-                     '()) ", " state))
-        list-transform list-transform-state)
-      (println "≡> user-transform " (if x " (*)" ""))))
-
-  ;; Thunk/string
-  (define (set-transform! obj)
-    (cond
-      ((procedure? obj)
-       (set! transform obj))
-      ((and (string? obj)
-            (assoc obj list-transform))
-       => (lambda (thunk)
-            (set! transform (cdr thunk))))
-      (else
-        (error "Function " obj " not available"))))
-
-  (define (inner-termite-modules msg)
-    (cond
-      ((assoc msg env) => cdr)
-      (else (error "No such service '" msg "'"))))
-
-  (define (inner-serialize-hook obj len depth)
-    (cond
-      ;; Unpack promise instead of force
-      ((##promise? obj)
+    ((proxy? obj)
+     (let ((pid (proxy-upid obj)))
        (begin
-         (let ((thunk (##promise-thunk obj)))
-           (if thunk
-             (make-proxy-callback thunk)
-             (##promise-result obj)))))
+         (proxy-upid-set! obj pid)
+         obj)))
 
-      ((proxy? obj)
-       (let ((pid (proxy-upid obj)))
-         (begin
-           (proxy-upid-set! obj pid)
-           obj)))
+    ((process? obj)
+     (pid->upid obj))
 
-      ((process? obj)
-       (pid->upid obj))
+    ((tag? obj)
+     (tag->utag obj))
 
-      ((tag? obj)
-       (tag->utag obj))
+    ; Identify builtin procedure.
+    ;((procedure? obj)
+    ; (let ((name (##procedure-name obj)))
+    ;   (if (and name
+    ;            (not (char=? (string-ref (symbol->string name) 1)
+    ;                    #\#)))
+    ;     obj
+    ;     (if (or
+    ;           (> len max-length)
+    ;           (> depth max-depth))
+    ;       (make-proxy (make-element-proxy obj))
+    ;       obj))))
 
-      ; Identify builtin procedure.
-      ;((procedure? obj)
-      ; (let ((name (##procedure-name obj)))
-      ;   (if (and name
-      ;            (not (char=? (string-ref (symbol->string name) 1)
-      ;                    #\#)))
-      ;     obj
-      ;     (if (or
-      ;           (> len max-length)
-      ;           (> depth max-depth))
-      ;       (make-proxy (make-element-proxy obj))
-      ;       obj))))
+    ;; unserializable objects, so instead of crashing we set them to #f
+    ((or (port? obj))
+     #f)
 
-
-      ((pair? obj)
-       (transform obj len depth (lambda (obj) (make-proxy (make-element-proxy obj)))))
-
-      ;; unserializable objects, so instead of crashing we set them to #f
-      ((or (port? obj))
-       #f)
-
-      (else obj)))
-
-  ;; Register codes
-  (begin
-    (set! termite-modules inner-termite-modules)
-    (set! serialize-hook inner-serialize-hook)
-    (register "register" register)
-    (register "ls-functions" ls-functions)
-    (register "max-depth-set!" max-depth-set!)
-    (register "max-length-set!" max-length-set!)
-    (register "max-norm-set!" max-norm-set!)
-    (register "ls-transform" ls-transform)
-    (register "set-transform!" set-transform!)))
+    (else obj)))
 
 (define (upid->pid obj)
   (cond
@@ -493,7 +367,7 @@
 
 (define (serialize obj port)
   (let* ((serialized-obj
-            (lazy-object->u8vector obj serialize-hook))
+            (object->u8vector obj serialize-hook))
      (len
        (u8vector-length serialized-obj))
      (serialized-len

@@ -42,7 +42,7 @@
         proxy-print-debugging-info
         proxy-reset-counter
         ;; Lazyness paremeter
-        termite-modules
+        ;termite-modules
         ;max-length-get
         ;max-depth-get
         ;max-length-set!
@@ -53,8 +53,8 @@
         ))
 
 
-(##define-macro (macro-termite-modules func . args)
- `((termite-modules ,func) ,@args))
+;(##define-macro (macro-termite-modules func . args)
+; `((termite-modules ,func) ,@args))
 
 (##define-macro (compile-time-load filename)
   (load filename)
