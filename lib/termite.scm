@@ -443,9 +443,10 @@
 
 ;; a tcp server listens on a certain port for new tcp connection
 ;; requests, and call ON-CONNECT to deal with those new connections.
-(define (start-tcp-server tcp-port-number on-connect)
+(define (start-tcp-server tcp-address tcp-port-number on-connect)
   (let ((tcp-server-port
       (open-tcp-server (list
+               server-address: tcp-address
                port-number: tcp-port-number
                coalesce: #f))))
   (spawn
@@ -776,7 +777,7 @@
 (process-links-set! (self) '())
 
 (define (node-init node)
-  (start-tcp-server (node-port node) start-messenger)
+  (start-tcp-server (node-host node) (node-port node) start-messenger)
   (set! current-node (lambda () node))
   (publish-external-services)
   'ok)
