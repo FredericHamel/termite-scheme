@@ -61,7 +61,7 @@ c_compile() {
     fi 
 
     c_compile_file "Compiling object $fd" $fd $out &
-    (( cpt = 1 ))
+    (( cpt += 1 ))
   done
   for i in "${exe[@]}"; do
     out=${i%.*}
@@ -70,7 +70,7 @@ c_compile() {
       (( cpt = 0 ))
     fi 
     c_compile_file "Compiling executable $i" $i $out -exe &
-    (( cpt = 1 ))
+    (( cpt += 1 ))
   done
 
   # Wait for all build to end.
