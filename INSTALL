@@ -1,0 +1,10 @@
+
+Integrate Gambit with Termite
+=============================
+1. Add a symbolic link:
+  ~~lib/termite -> ..TERMITE/lib
+2. Add `(include "~~lib/termite/termite.scm")` to gambit/lib/termite/termite.scm
+3. Recompile and install gambit.
+
+This is based on this article http://scheme2006.cs.uchicago.edu/09-germain.pdf written by
+Guillaume Germain.
