@@ -5,4 +5,4 @@ if (( $# == 0 )); then
   exit 1
 fi;
 
-gsc-script -prelude "(##include \"~~lib/gambit#.scm\")(##include \"~~lib/termite/termite#.scm\")(load \"~~lib/termite/termite\")" $@
+gsc-script -prelude "(##include \"~~lib/gambit#.scm\")(##include \"~~lib/termite/termite#.scm\")" $@
