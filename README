@@ -4,6 +4,14 @@ Termite is Copyright 2005-2008 by Guillaume Germain
 Termite is released under the same license as Gambit itself, 
 see the LICENSE file.
 
+IMPORTANT
+=========
+ THe termite library is included inside gambit. It can
+be imported with
+```
+(import (termite))
+```
+
 * See the 'INSTALL' file for installation instructions. *
 
 The current code should be considered as beta quality.  That is,
